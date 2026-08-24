@@ -1,0 +1,18 @@
+# NetAlertX network-inventory service.
+# Replace <BRIDGED_INTERFACE> and <LAB_HOST_IP> with your own values before deploying.
+services:
+  netalertx:
+    image: ghcr.io/netalertx/netalertx:latest
+    container_name: netalertx
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /opt/netalertx/data:/data
+      - /etc/localtime:/etc/localtime:ro
+    tmpfs:
+      - /tmp:uid=20211,gid=20211,mode=1700
+    environment:
+      PORT: "20211"
+      LISTEN_ADDR: "<LAB_HOST_IP>"
+      APP_CONF_OVERRIDE: >-
+        {"GRAPHQL_PORT":"20212","SCAN_SUBNETS":"['192.168.0.0/24 --interface=<BRIDGED_INTERFACE>']"}

@@ -1,0 +1,26 @@
+[Unit]
+Description=Wazuh FIM to Airia analysis forwarder
+After=network-online.target wazuh-manager.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wazuh-airia
+Group=wazuh-airia
+SupplementaryGroups=wazuh
+EnvironmentFile=/etc/wazuh-airia-forwarder.env
+ExecStart=/opt/wazuh-airia-forwarder/venv/bin/python /opt/wazuh-airia-forwarder/wazuh_airia_forwarder.py
+WorkingDirectory=/opt/wazuh-airia-forwarder
+Restart=always
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/var/ossec/logs/alerts
+ReadWritePaths=/var/lib/wazuh-airia-forwarder
+RestrictAddressFamilies=AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
