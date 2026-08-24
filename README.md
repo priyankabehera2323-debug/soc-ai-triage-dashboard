@@ -105,7 +105,6 @@ Panels are color-coded independently for file action (added/modified/deleted) an
 
 - [ ] Move helper API from HTTP to HTTPS
 - [ ] Add rate limiting in front of the helper for multi-consumer scenarios
-- [ ] Extend Sigma-rule coverage from the companion `soc-detection-response-platform` repo into this pipeline
 - [ ] Record a short demo GIF of an FIM event flowing through to an AI-scored dashboard panel
 
 ---
