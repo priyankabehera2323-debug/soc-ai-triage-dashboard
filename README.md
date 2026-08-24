@@ -2,8 +2,7 @@
 
 A home-lab SOC pipeline that combines **Wazuh** (endpoint FIM/SIEM), **NetAlertX** (network inventory), an **LLM-based triage layer**, and **Grafana** (dashboarding) across a two-host network — built to practice real detection-engineering and SOC-analyst workflows end to end, from raw log to human-readable risk assessment.
 
-> Companion project to [`soc-detection-response-platform`](../soc-detection-response-platform) — that repo focuses on Sigma-rule detection engineering against Wazuh; this one focuses on **AI-assisted alert triage** and **multi-source dashboarding**.
-
+> Companion project to [`soc-detection-response-platform`](https://github.com/priyankabehera2323-debug/soc-detection-response-platform) — that repo focuses on Sigma-rule detection engineering against Wazuh; this one focuses on **AI-assisted alert triage** and **multi-source dashboarding**.
 ---
 
 ## Why this project
