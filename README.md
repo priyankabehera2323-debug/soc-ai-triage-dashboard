@@ -2,7 +2,6 @@
 
 A home-lab SOC pipeline that combines **Wazuh** (endpoint FIM/SIEM), **NetAlertX** (network inventory), an **LLM-based triage layer**, and **Grafana** (dashboarding) across a two-host network — built to practice real detection-engineering and SOC-analyst workflows end to end, from raw log to human-readable risk assessment.
 
-> Companion project to [`soc-detection-response-platform`](https://github.com/priyankabehera2323-debug/soc-detection-response-platform) — that repo focuses on Sigma-rule detection engineering against Wazuh; this one focuses on **AI-assisted alert triage** and **multi-source dashboarding**.
 ---
 
 ## Why this project
@@ -13,6 +12,22 @@ Most junior-SOC portfolios stop at "I wrote some Sigma rules and made a dashboar
 
 ## Architecture
 
+```
+┌─────────────────────────┐ TCP 1514/1515 ┌──────────────────────────────┐
+│ Windows Endpoint │ ───────────────────────────▶ │ Ubuntu VM │
+│ - Wazuh Agent │ │ - Wazuh Manager │
+│ - FIM: monitored dir │ │ - Wazuh Indexer (OpenSearch) │
+│ - Grafana (dashboard) │ ◀────── HTTPS :9200 ──────── │ - NetAlertX (Docker) │
+│ │ ◀────── HTTP :20212 ──────── │ - Airia Helper (systemd) │
+│ │ ◀────── HTTP :8010 ──────── │ │
+└─────────────────────────┘ └────────────┬─────────────────┘
+│ HTTPS + X-API-Key
+▼
+┌──────────────────┐
+│ Airia Agent │
+│ (LLM risk triage) │
+└──────────────────┘
+```
 
 **Data flow:** Windows FIM event → Wazuh Manager → `alerts.json` → Python helper service tails the log, filters for `syscheck` events → forwards to Airia agent → Airia returns a structured JSON risk assessment → helper exposes it via a small internal API → Grafana (OpenSearch + Infinity data sources) renders FIM activity, network inventory, and AI risk scores side by side.
 
@@ -68,7 +83,21 @@ Panels are color-coded independently for file action (added/modified/deleted) an
 ---
 
 ## Repo structure
-
+```
+.
+├── forwarder/
+│ └── wazuh_airia_forwarder.py # Wazuh → Airia → Grafana API bridge
+├── config/
+│ ├── netalertx-compose.yml
+│ ├── wazuh-airia-forwarder.service
+│ └── wazuh-airia-forwarder.env.example
+├── airia/
+│ └── system_prompt.md # LLM triage playbook (risk rubric + trust boundary)
+├── grafana/
+│ └── README.md # How to export your dashboard.json here
+└── docs/
+└── ARCHITECTURE.md # Full build/troubleshooting notes
+```
 
 ---
 
@@ -78,6 +107,10 @@ Panels are color-coded independently for file action (added/modified/deleted) an
 - [ ] Add rate limiting in front of the helper for multi-consumer scenarios
 - [ ] Extend Sigma-rule coverage from the companion `soc-detection-response-platform` repo into this pipeline
 - [ ] Record a short demo GIF of an FIM event flowing through to an AI-scored dashboard panel
+
+---
+
+📖 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full build order, security rationale, and troubleshooting guide.
 
 ---
 
