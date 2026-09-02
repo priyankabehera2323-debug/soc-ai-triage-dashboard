@@ -101,8 +101,18 @@ Panels are color-coded independently for file action (added/modified/deleted) an
 
 ---
 
-## Status / next steps
+## Build progress
 
+- [x] Ubuntu Server VM provisioned (dual-homed: Host-Only + NAT networking, UFW firewall scoped to host IP)
+- [x] Wazuh Manager, Indexer, and Dashboard installed and running
+- [x] Wazuh Indexer bound to correct network IP with a valid TLS certificate (SAN matches host IP)
+- [x] Dedicated read-only OpenSearch role/account created for Grafana (least-privilege, not using the admin account)
+- [x] Windows Wazuh agent installed, connected, and actively reporting — File Integrity Monitoring and Security Configuration Assessment (CIS benchmark) both running
+- [ ] Configure FIM on a dedicated test directory and validate add/modify/delete events end-to-end
+- [ ] Deploy NetAlertX for network inventory
+- [ ] Build and test the Airia AI triage agent
+- [ ] Deploy the Wazuh-to-Airia forwarder service
+- [ ] Configure Grafana data sources and build the dashboard
 - [ ] Move helper API from HTTP to HTTPS
 - [ ] Add rate limiting in front of the helper for multi-consumer scenarios
 - [ ] Record a short demo GIF of an FIM event flowing through to an AI-scored dashboard panel
