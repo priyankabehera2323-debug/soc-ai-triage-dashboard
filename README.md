@@ -1,8 +1,8 @@
 # AI-Assisted File Integrity Monitoring & Network Security Dashboard
 
-A home-lab SOC pipeline built to practise the whole path from a raw endpoint event to an analyst-ready result. **Wazuh** watches a Windows laptop for file changes, a small **Python service** scores every change with fixed rules, and a **local LLM (Ollama)** can add a plain-English summary. **Grafana** and **NetAlertX** (network inventory) are the next pieces.
+A home-lab SOC pipeline built to practise the whole path from a raw endpoint event to an analyst-ready result. **Wazuh** watches a Windows laptop for file changes, a small **Python service** scores every change with fixed rules, and a **local LLM (Ollama)** can add a plain-English summary. **Grafana** provides SOC monitoring and security alert visualization, with **NetAlertX** planned for network inventory.
 
-> **Status: work in progress.** The path from the Windows agent through Wazuh to the scoring API works end to end and has been tested on real alerts. The Grafana dashboard and NetAlertX are not built yet; see [Build progress](#build-progress).
+> **Status: Work in progress.** The Windows agent-to-Wazuh-to-Python scoring pipeline works end to end and has been tested with real alerts. Grafana is now connected to Wazuh OpenSearch, and a SOC monitoring dashboard with 13 panels has been built and saved. NetAlertX deployment and further project improvements remain in progress. See [Build progress](#build-progress).
 
 ---
 
@@ -16,21 +16,36 @@ I tested it. A small local model (qwen3:0.6b), told to treat the event as untrus
 
 ## Architecture
 
-```
-┌────────────────────────────────┐                          ┌───────────────────────────────────┐
-│ Windows laptop                 │                          │ Ubuntu VM (Wazuh server)          │
-│                                │                          │                                   │
-│ - Wazuh agent                  │ ── TCP 1514 (events) ──▶ │ - Wazuh Manager -> alerts.json    │
-│   (FIM on C:\SOC-Lab\fim-test) │                          │ - Filebeat -> Wazuh Indexer       │
-│                                │                          │ - Wazuh Dashboard                 │
-│ - Browser: Wazuh Dashboard     │ ◀── HTTPS 443 ─────────  │ - Forwarder service (systemd)     │
-│                                │                          │     tails alerts.json             │
-│ - Grafana (planned)            │                          │     scores with fixed rules       │
-│                                │                          │     read-only API (:8010)         │
-│                                │                          │ - Ollama + qwen3:0.6b (local,     │
-│                                │                          │     off by default): summary text │
-│                                │                          │ - NetAlertX (planned)             │
-└────────────────────────────────┘                          └───────────────────────────────────┘
+```text
+┌────────────────────────────────┐
+│ Windows laptop                 │
+│                                │
+│ - Wazuh agent                  │
+│   (FIM on C:\SOC-Lab\fim-test) │
+│ - Wazuh Dashboard (browser)    │
+│ - Grafana 13                   │
+│   - OpenSearch data source     │
+│   - 13 SOC monitoring panels  │
+└───────────────┬────────────────┘
+                │
+                │ Wazuh events
+                │ TCP 1514
+                ▼
+┌────────────────────────────────────┐
+│ Ubuntu VM (Wazuh server)           │
+│                                    │
+│ - Wazuh Manager -> alerts.json     │
+│ - Filebeat -> Wazuh Indexer        │
+│ - Wazuh Dashboard                  │
+│ - OpenSearch Indexer               │
+│ - Forwarder service (systemd)      │
+│     tails alerts.json              │
+│     scores with fixed rules        │
+│     read-only API (:8010)          │
+│ - Ollama + qwen3:0.6b              │
+│     optional summary text          │
+│ - NetAlertX (planned)              │
+└────────────────────────────────────┘
 ```
 
 **Data flow**
@@ -41,7 +56,8 @@ I tested it. A small local model (qwen3:0.6b), told to treat the event as untrus
 4. The forwarder service tails `alerts.json` and keeps only `added`, `modified` and `deleted` file-integrity events.
 5. It scores each event with fixed rules (event type, Wazuh rule level, sensitive-path patterns, executable file types) and stores the result immediately with a template summary.
 6. If the local model is enabled and the VM has enough free memory, it rewrites the summary in plain English. The score is never touched.
-7. A read-only HTTP API (API-key protected) serves the latest result and the history. Grafana will read it.
+7. A read-only HTTP API (API-key protected) serves the latest result and history.
+8. Grafana connects to Wazuh OpenSearch through a read-only account and visualizes security alerts in the SOC dashboard.
 
 | Component | Role | Host | Status |
 |---|---|---|---|
@@ -49,8 +65,34 @@ I tested it. A small local model (qwen3:0.6b), told to treat the event as untrus
 | Wazuh Manager, Indexer, Dashboard, Filebeat | Analysis, storage, web UI | Ubuntu VM | Running |
 | Forwarder service | Scoring, optional LLM summaries, read-only API | Ubuntu VM (systemd) | Running |
 | Ollama (qwen3:0.6b) | Summary wording only | Ubuntu VM | Working, off by default |
-| Grafana | Dashboard | Windows laptop | Planned |
+| Grafana 13 | SOC monitoring and security alert visualization | Windows laptop | Connected — 13 panels saved |
 | NetAlertX | Network inventory | Ubuntu VM (Docker) | Planned |
+
+---
+
+## Grafana SOC Monitoring Dashboard
+
+Grafana is connected to Wazuh OpenSearch using a dedicated read-only account.
+
+The dashboard currently contains 13 saved panels:
+
+1. Total Security Alerts
+2. Higher-Severity Alerts (Levels 7–10)
+3. Security Alerts Over Time
+4. Top 10 Alert Rules
+5. Top 10 Alert-Generating Agents
+6. Recent Security Events
+7. Alert Severity Distribution
+8. Failed Login Attempts
+9. SSH Brute-Force Attempts
+10. Successful Login Activity
+11. Alerts by Severity
+12. Top Source IPs – Failed Authentication
+13. Top 10 Triggered Wazuh Rules
+
+The dashboard supports monitoring of alert volume, severity, authentication activity, suspicious login patterns, source IP addresses and frequently triggered detection rules.
+
+**Note:** Alert counts represent matching Wazuh alert events, not necessarily unique attacks or incidents. For example, `127.0.0.1` appeared as a source IP during local SSH authentication testing.
 
 ---
 
@@ -60,11 +102,11 @@ I tested it. A small local model (qwen3:0.6b), told to treat the event as untrus
 
 **Untrusted data is handled as untrusted.** Control characters are stripped and lengths capped before anything reaches the model. The model sees only the agent name, rule ID and level, event type, the path and the computed score; no file contents, hashes or diffs. Only the `summary` and `recommended_actions` fields are read from its reply; anything else it returns, including a score, is ignored.
 
-**Everything stays local.** Inference runs on the VM through Ollama, so alert data never leaves the lab network.
+**Local inference.** Inference runs on the VM through Ollama, so the model's processing stays within the lab network. Note that the Wazuh VirusTotal integration can send file hashes to an external service.
 
 **Built for a small VM.** The VM has 4 GB of RAM. The model is unloaded after each answer, runs at most three times a minute, and is skipped when less than 900 MB is free, so a scan that produces hundreds of events can't flood the CPU. Skipped events keep their template summary.
 
-**Least privilege.** Grafana is meant to read Wazuh data through a read-only OpenSearch role, never the admin account. The forwarder runs as its own unprivileged user under a hardened systemd unit (no new privileges, read-only access to the alert log, write access only to its own state folder), and its API is bound to loopback and requires an API key.
+**Least privilege.** Grafana reads Wazuh data through a dedicated read-only OpenSearch role, never the admin account. The forwarder runs as its own unprivileged user under a hardened systemd unit (no new privileges, read-only access to the alert log, write access only to its own state folder), and its API is bound to loopback and requires an API key.
 
 **Fail-safe tailing.** The service remembers its position in `alerts.json`, copes with log rotation, and never consumes a half-written line. If the model is slow, down or returns garbage, the event is still scored and stored.
 
@@ -87,15 +129,21 @@ Each line shows the event, its score and severity, and why.
 - [x] Ubuntu Server VM in VirtualBox (Host-Only and NAT adapters)
 - [x] Wazuh Manager, Indexer, Dashboard and Filebeat installed and running
 - [x] Indexer TLS certificate regenerated so its SAN matches the address the Indexer is bound to
-- [x] Read-only OpenSearch role and user for Grafana created and tested (to be re-tested after the address change below)
+- [x] Read-only OpenSearch role and user for Grafana created and tested
 - [x] Windows agent connected over the Host-Only network
 - [x] FIM on a dedicated folder verified end to end: add, modify and delete events (rules 554, 550, 553) reach the Wazuh Dashboard
 - [x] Forwarder service: rule-based scoring, API-key auth, hardened systemd unit, running
 - [x] Local LLM summaries working (qwen3:0.6b); off by default because of memory pressure
-- [ ] Move the Indexer, Dashboard and Filebeat to the Host-Only address and re-issue the certificate
-- [ ] Install Grafana, add data sources, build the dashboard
+- [x] Grafana 13 installed on Windows
+- [x] Grafana OpenSearch data source configured and connection tested
+- [x] Grafana SOC monitoring dashboard created with 13 panels
+- [x] Failed and successful authentication monitoring configured
+- [x] SSH brute-force alert monitoring configured using Wazuh rule 2502
+- [x] Source IP and top triggered Wazuh rule monitoring configured
+- [ ] Export and commit Grafana dashboard JSON
+- [ ] Add dashboard screenshots and project demonstration
 - [ ] Deploy NetAlertX
-- [ ] Tighten the VM firewall (current rules are broader than intended)
+- [ ] Tighten the VM firewall
 - [ ] Put the forwarder API behind HTTPS before exposing it beyond the VM
 - [ ] Add the forwarder's tests to the repo
 - [ ] Record a short demo of an event flowing through to the dashboard
@@ -108,13 +156,13 @@ Each line shows the event, its score and severity, and why.
 - Files in the configured test folder are capped at Low so lab demos don't look alarming.
 - A 0.6B model writes fluent but sometimes vague or wrong summaries; in testing, one summary stated a detail that wasn't in the event. That is why it cannot influence the score.
 - Lab-grade security: self-signed certificates, and the API is plain HTTP on loopback for now.
-- The Wazuh Manager in this lab also has a VirusTotal integration enabled. It sends file hashes to an external service, so it would need turning off to keep the "nothing leaves the lab" claim fully true.
+- The Wazuh Manager in this lab also has a VirusTotal integration enabled. It sends file hashes to an external service, so the "nothing leaves the lab" claim does not apply to that integration.
 
 ---
 
 ## Repo structure
 
-```
+```text
 .
 ├── forwarder/
 │   └── wazuh_ollama_forwarder.py           # scoring, optional LLM summaries, read-only API
@@ -130,7 +178,9 @@ Each line shows the event, its score and severity, and why.
 
 ## Stack
 
-`Wazuh 4.14` · `OpenSearch` · `Filebeat` · `Python 3 / Flask / waitress` · `Ollama (qwen3:0.6b)` · `systemd` · `UFW` · `VirtualBox` · planned: `Grafana`, `NetAlertX`
+`Wazuh 4.14` · `OpenSearch` · `Filebeat` · `Grafana 13` · `Python 3 / Flask / waitress` · `Ollama (qwen3:0.6b)` · `systemd` · `UFW` · `VirtualBox`
+
+Planned: `NetAlertX`
 
 ---
 
