@@ -163,17 +163,25 @@ Each line shows the event, its score and severity, and why.
 ## Repo structure
 
 ```text
-.
-├── forwarder/
-│   └── wazuh_ollama_forwarder.py           # scoring, optional LLM summaries, read-only API
+
+soc-ai-triage-dashboard/
+│
 ├── config/
-│   ├── wazuh-ollama-forwarder.service      # hardened systemd unit
-│   ├── wazuh-ollama-forwarder.env.example  # settings template (no secrets)
-│   └── netalertx-compose.yml               # planned, not deployed yet
+│   ├── netalertx-compose.yml
+│   ├── wazuh-ollama-forwarder.env.example
+│   └── wazuh-ollama-forwarder.service
+│
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── GRAFANA_DASHBOARD.md       
+│
+├── forwarder/
+│   └── wazuh_ollama_forwarder.py
+│
 ├── grafana/
-│   └── README.md                           # how to export the dashboard JSON
-└── docs/
-    └── ARCHITECTURE.md                     # design, scoring rules, tests, troubleshooting
+│   └── README.md
+└── README.md
+
 ```
 
 ## Stack
