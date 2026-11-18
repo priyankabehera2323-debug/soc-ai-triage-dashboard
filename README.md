@@ -90,7 +90,7 @@ The dashboard currently contains 13 saved panels:
 12. Top Source IPs – Failed Authentication
 13. Top 10 Triggered Wazuh Rules
 
-The dashboard supports monitoring of alert volume, severity, authentication activity, suspicious login patterns, source IP addresses and frequently triggered detection rules.
+The dashboard provides visibility into alert volume, severity, authentication activity, SSH brute-force-related events, source IP addresses and frequently triggered Wazuh rules.
 
 **Note:** Alert counts represent matching Wazuh alert events, not necessarily unique attacks or incidents. For example, `127.0.0.1` appeared as a source IP during local SSH authentication testing.
 
